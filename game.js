@@ -1,107 +1,108 @@
+// Get the canvas and context
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-// Canvas size
+// Set canvas size
 canvas.width = 800;
 canvas.height = 400;
 
-// Players
-const player1 = { x: 100, y: 300, width: 20, height: 50, dy: 0, onGround: true };
-const player2 = { x: 680, y: 300, width: 20, height: 50, dy: 0, onGround: true };
-const gravity = 0.5;
-const jumpPower = -10;
+// Ball properties
+let ball = {
+    x: canvas.width / 2,
+    y: canvas.height / 2,
+    radius: 10,
+    dx: 3,
+    dy: 3
+};
 
-// Ball
-const ball = { x: 400, y: 200, radius: 10, dx: 4, dy: 4 };
+// Paddle properties
+const paddleHeight = 80, paddleWidth = 10;
+let leftPaddle = { x: 20, y: canvas.height / 2 - paddleHeight / 2, dy: 0 };
+let rightPaddle = { x: canvas.width - 30, y: canvas.height / 2 - paddleHeight / 2, dy: 0 };
+const paddleSpeed = 5;
 
-// Key states
-const keys = {};
-window.addEventListener("keydown", (e) => (keys[e.code] = true));
-window.addEventListener("keyup", (e) => (keys[e.code] = false));
+// Function to draw the volleyball net
+function drawNet() {
+    ctx.fillStyle = "white";
+    const netWidth = 4;
+    ctx.fillRect(canvas.width / 2 - netWidth / 2, 0, netWidth, canvas.height);
+}
 
-// Game loop
+// Function to draw the paddles
+function drawPaddle(paddle) {
+    ctx.fillStyle = "white";
+    ctx.fillRect(paddle.x, paddle.y, paddleWidth, paddleHeight);
+}
+
+// Function to draw the ball
+function drawBall() {
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+    ctx.fillStyle = "white";
+    ctx.fill();
+    ctx.closePath();
+}
+
+// Function to move paddles
+function movePaddles() {
+    leftPaddle.y += leftPaddle.dy;
+    rightPaddle.y += rightPaddle.dy;
+
+    // Prevent paddles from moving out of bounds
+    leftPaddle.y = Math.max(0, Math.min(canvas.height - paddleHeight, leftPaddle.y));
+    rightPaddle.y = Math.max(0, Math.min(canvas.height - paddleHeight, rightPaddle.y));
+}
+
+// Function to update the game state
 function update() {
-    // Apply gravity
-    [player1, player2].forEach(player => {
-        if (!player.onGround) {
-            player.dy += gravity;
-        }
-        player.y += player.dy;
-        if (player.y >= 300) {
-            player.y = 300;
-            player.dy = 0;
-            player.onGround = true;
-        }
-    });
+    ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
 
-    // Player 1 controls (W to jump, A & D to move)
-    if (keys["KeyA"]) player1.x -= 5;
-    if (keys["KeyD"]) player1.x += 5;
-    if (keys["KeyW"] && player1.onGround) {
-        player1.dy = jumpPower;
-        player1.onGround = false;
-    }
+    drawNet(); // Draw the net
+    drawPaddle(leftPaddle); // Draw left paddle
+    drawPaddle(rightPaddle); // Draw right paddle
+    drawBall(); // Draw the ball
 
-    // Player 2 controls (Arrow keys)
-    if (keys["ArrowLeft"]) player2.x -= 5;
-    if (keys["ArrowRight"]) player2.x += 5;
-    if (keys["ArrowUp"] && player2.onGround) {
-        player2.dy = jumpPower;
-        player2.onGround = false;
-    }
+    movePaddles(); // Update paddle movement
 
-    // Ball movement
+    // Move the ball
     ball.x += ball.dx;
     ball.y += ball.dy;
-    ball.dy += gravity; // Apply gravity to ball
 
-    // Ball collision with walls
-    if (ball.x - ball.radius < 0 || ball.x + ball.radius > canvas.width) {
-        ball.dx *= -1;
-    }
-    if (ball.y - ball.radius < 0) {
+    // Ball collision with top and bottom walls
+    if (ball.y + ball.radius > canvas.height || ball.y - ball.radius < 0) {
         ball.dy *= -1;
     }
 
-    // Ball collision with players
-    [player1, player2].forEach(player => {
-        if (
-            ball.x + ball.radius > player.x &&
-            ball.x - ball.radius < player.x + player.width &&
-            ball.y + ball.radius > player.y &&
-            ball.y - ball.radius < player.y + player.height
-        ) {
-            ball.dy = -8;
-            ball.dx *= -1;
-        }
-    });
-
-    // Ball touching the ground (reset position)
-    if (ball.y + ball.radius > canvas.height) {
-        ball.x = 400;
-        ball.y = 200;
-        ball.dy = -5;
+    // Ball collision with paddles
+    if (
+        (ball.x - ball.radius < leftPaddle.x + paddleWidth && ball.y > leftPaddle.y && ball.y < leftPaddle.y + paddleHeight) ||
+        (ball.x + ball.radius > rightPaddle.x && ball.y > rightPaddle.y && ball.y < rightPaddle.y + paddleHeight)
+    ) {
+        ball.dx *= -1; // Reverse ball direction
     }
 
-    draw();
-    requestAnimationFrame(update);
+    // Ball reset if out of bounds
+    if (ball.x < 0 || ball.x > canvas.width) {
+        ball.x = canvas.width / 2;
+        ball.y = canvas.height / 2;
+        ball.dx *= -1;
+    }
+
+    requestAnimationFrame(update); // Animate the game
 }
 
-// Draw function
-function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+// Event listeners for paddle movement
+document.addEventListener("keydown", (event) => {
+    if (event.key === "w") leftPaddle.dy = -paddleSpeed; // Move left paddle up
+    if (event.key === "s") leftPaddle.dy = paddleSpeed; // Move left paddle down
+    if (event.key === "ArrowUp") rightPaddle.dy = -paddleSpeed; // Move right paddle up
+    if (event.key === "ArrowDown") rightPaddle.dy = paddleSpeed; // Move right paddle down
+});
 
-    // Draw players
-    ctx.fillStyle = "blue";
-    ctx.fillRect(player1.x, player1.y, player1.width, player1.height);
-    ctx.fillStyle = "red";
-    ctx.fillRect(player2.x, player2.y, player2.width, player2.height);
+document.addEventListener("keyup", (event) => {
+    if (event.key === "w" || event.key === "s") leftPaddle.dy = 0;
+    if (event.key === "ArrowUp" || event.key === "ArrowDown") rightPaddle.dy = 0;
+});
 
-    // Draw ball
-    ctx.fillStyle = "orange";
-    ctx.beginPath();
-    ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-    ctx.fill();
-}
-
+// Start the game loop
 update();
