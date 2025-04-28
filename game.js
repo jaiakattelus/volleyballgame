@@ -1,262 +1,295 @@
-// === GLOBAL VARIABLES ===
-
-// Ball properties
-let ball;
-
-// Player properties
-let playerLeft, playerRight;
-
-// Court properties
+let player, opponent, ball;
+let net;
+let gravity = 0.4;
+let jumpForce = -8;
+let spikeForce = -12;
 let groundLevel;
-let pointScored = false;
-let leftScore = 0;
-let rightScore = 0;
+let playerScore = 0;
+let opponentScore = 0;
+let playerSpiking = false;
+let opponentSpiking = false;
 let gameOver = false;
+let winner = "";
 
-// Constants
-const paddleWidth = 20;
-const paddleHeight = 60;
-const playerSpeed = 5;
-const jumpStrength = 15;
-const gravity = 1;
-const ballSpeed = 5;
-const maxScore = 5;
-
-// Setup game
 function setup() {
-  createCanvas(800, 400);
-  groundLevel = height - 50;
-
-  ball = {
-    x: width/2,
-    y: groundLevel - 100,
-    radius: 12,
-    dx: random([-ballSpeed, ballSpeed]),
-    dy: -ballSpeed
-  };
-
-  playerLeft = createPlayer(100, "Team A", 1);
-  playerRight = createPlayer(width - 140, "Team B", 2);
+  createCanvas(800, 450);
+  groundLevel = height - 80;
+  
+  player = { x: 150, y: groundLevel, w: 20, h: 50, vy: 0, speed: 5, isJumping: false, isBlocking: false };
+  opponent = { x: width - 150, y: groundLevel, w: 20, h: 50, vy: 0, speed: 3, isJumping: false, isBlocking: false };
+  ball = { x: width/2, y: 100, r: 15, vx: 4, vy: -6 };
+  net = { x: width/2 - 5, y: groundLevel - 100, w: 10, h: 100 };
 }
 
-// Create a player object
-function createPlayer(x, team, number) {
-  return {
-    x: x,
-    y: groundLevel - paddleHeight,
-    dy: 0,
-    isJumping: false,
-    team: team,
-    number: number,
-    logoColor: team === "Team A" ? color(255, 100, 100) : color(100, 100, 255)
-  };
-}
-
-// Main game loop
 function draw() {
-  background(0, 100, 200); // Sky
-  
-  drawBackground(); // Draw crowd and court
-  
   if (gameOver) {
-    showVictoryScreen();
+    drawVictoryScreen();
     return;
   }
-
-  movePlayers();
+  
+  drawBackground();
+  
+  // Net
+  fill(255);
+  rect(net.x, net.y, net.w, net.h);
+  
+  // Players
+  drawPlayer(player, color(0, 0, 255), 1, playerSpiking, player.isBlocking); // Blue
+  drawPlayer(opponent, color(255, 50, 50), 2, opponentSpiking, opponent.isBlocking); // Red
+  
+  // Ball
+  drawVolleyball(ball.x, ball.y, ball.r);
+  
+  handlePlayerMovement();
+  handleOpponentAI();
   moveBall();
   
-  drawNet();
-  drawBall();
-  drawPlayer(playerLeft);
-  drawPlayer(playerRight);
-  
-  displayScore();
+  drawScores();
 }
 
-// === FUNCTIONS ===
-
-// Draw background with court, crowd, benches
-function drawBackground() {
-  // Crowd
-  for (let y = 20; y < 100; y += 10) {
-    for (let x = 0; x < width; x += 10) {
-      let bounce = 0;
-      if (pointScored) bounce = random(-2, 2);
-      fill(random(150, 255), random(150, 255), random(150, 255));
-      rect(x, y + bounce, 8, 8);
-    }
-  }
+// Draw players in pixel art
+function drawPlayer(p, col, number, isSpiking, isBlocking) {
+  push();
+  translate(p.x, p.y);
+  scale(2);
   
-  // Stage divider
-  fill(50);
-  rect(0, 100, width, 20);
-  
-  // Court
-  fill(150, 220, 255); // Left half
-  rect(50, groundLevel - 200, width/2 - 50, 200);
-  
-  fill(150, 255, 150); // Right half
-  rect(width/2, groundLevel - 200, width/2 - 50, 200);
-  
-  // Outer boundary
-  stroke(255);
-  strokeWeight(3);
-  noFill();
-  rect(50, groundLevel - 200, width - 100, 200);
-  
-  // Net line
-  line(width/2, groundLevel, width/2, groundLevel - 200);
-  
-  // 10-foot (attack) lines
-  let attackLineOffset = (width - 100) / 6;
-  line(width/2 - attackLineOffset, groundLevel, width/2 - attackLineOffset, groundLevel - 200);
-  line(width/2 + attackLineOffset, groundLevel, width/2 + attackLineOffset, groundLevel - 200);
-  noStroke();
-  
-  // Benches
-  fill(100);
-  rect(70, groundLevel - 250, 60, 30);
-  rect(width - 130, groundLevel - 250, 60, 30);
-  
-  // Referee stand
-  fill(220);
-  rect(width/2 - 10, groundLevel - 250, 20, 50);
-}
-
-// Draw net
-function drawNet() {
-  stroke(255);
-  strokeWeight(4);
-  line(width/2, groundLevel - 200, width/2, groundLevel);
-  noStroke();
-}
-
-// Draw ball
-function drawBall() {
-  fill(255);
-  ellipse(ball.x, ball.y, ball.radius * 2);
-  
-  stroke(200);
-  strokeWeight(2);
-  line(ball.x, ball.y - ball.radius, ball.x, ball.y + ball.radius);
-  line(ball.x - ball.radius, ball.y, ball.x + ball.radius, ball.y);
-  noStroke();
-}
-
-// Draw a player
-function drawPlayer(player) {
-  // Body
-  fill(player.logoColor);
-  rect(player.x, player.y, paddleWidth, paddleHeight, 5);
+  // Headband
+  fill(0);
+  rect(-4, -14, 8, 2);
   
   // Face
   fill(255, 224, 189);
-  rect(player.x + 2, player.y - 20, 16, 16, 5);
+  rect(-3, -12, 6, 6);
   
   // Eyes
   fill(0);
-  ellipse(player.x + 6, player.y - 14, 2, 2);
-  ellipse(player.x + 14, player.y - 14, 2, 2);
+  rect(-2, -10, 1, 1);
+  rect(1, -10, 1, 1);
+  
+  // Mouth
+  rect(-1, -8, 2, 1);
+  
+  // Jersey
+  fill(col);
+  rect(-4, -6, 8, 8);
   
   // Jersey number
+  fill(255);
+  textSize(5);
+  textAlign(CENTER, CENTER);
+  text(number, 0, -2);
+  
+  // Logo
+  fill(255, 255, 0);
+  rect(3, -4, 2, 2);
+  
+  // Legs
   fill(0);
-  textAlign(CENTER);
-  textSize(10);
-  text(player.number, player.x + paddleWidth/2, player.y + paddleHeight/2);
+  rect(-3, 2, 2, 4);
+  rect(1, 2, 2, 4);
+  
+  // Shoes
+  fill(255);
+  rect(-3, 6, 2, 1);
+  rect(1, 6, 2, 1);
+  
+  // Poses
+  if (isSpiking) {
+    fill(col);
+    rect(6, -6, 3, 6); // Spike arm
+  } else if (isBlocking) {
+    fill(col);
+    rect(-8, -6, 3, 6);
+    rect(5, -6, 3, 6);
+  }
+  
+  pop();
 }
 
-// Move players
-function movePlayers() {
-  // Apply gravity
-  [playerLeft, playerRight].forEach(player => {
-    if (player.isJumping) {
-      player.dy += gravity;
-      player.y += player.dy;
-      if (player.y >= groundLevel - paddleHeight) {
-        player.y = groundLevel - paddleHeight;
-        player.isJumping = false;
-        player.dy = 0;
-      }
+// Draw better volleyball
+function drawVolleyball(x, y, r) {
+  push();
+  translate(x, y);
+  
+  fill(255);
+  stroke(0);
+  strokeWeight(1);
+  ellipse(0, 0, r*2);
+  
+  // Stripes
+  noFill();
+  stroke(0);
+  arc(0, 0, r*2, r*2, QUARTER_PI, PI + QUARTER_PI);
+  arc(0, 0, r*1.5, r*1.5, -QUARTER_PI, PI - QUARTER_PI);
+  line(-r/2, -r/2, r/2, r/2);
+  line(r/2, -r/2, -r/2, r/2);
+  
+  pop();
+}
+
+// Background
+function drawBackground() {
+  background(80, 120, 200);
+  
+  // Crowd
+  for (let y = 20; y < 100; y += 10) {
+    for (let x = 0; x < width; x += 10) {
+      fill(random(100, 255), random(100, 255), random(100, 255));
+      rect(x, y, 8, 8);
     }
-  });
+  }
+  
+  fill(50);
+  rect(0, 100, width, 20);
+  
+  fill(100, 255, 100);
+  rect(0, groundLevel, width, height - groundLevel);
+  
+  // Court lines
+  stroke(255);
+  strokeWeight(2);
+  line(0, groundLevel, width, groundLevel);
+  line(width/2, groundLevel, width/2, groundLevel - 100);
+  noStroke();
 }
 
-// Move ball and handle collisions
+function handlePlayerMovement() {
+  if (keyIsDown(LEFT_ARROW)) player.x -= player.speed;
+  if (keyIsDown(RIGHT_ARROW)) player.x += player.speed;
+  
+  player.y += player.vy;
+  player.vy += gravity;
+  
+  if (player.y > groundLevel) {
+    player.y = groundLevel;
+    player.vy = 0;
+    player.isJumping = false;
+    playerSpiking = false;
+    player.isBlocking = false;
+  }
+}
+
+function handleOpponentAI() {
+  if (ball.x > width/2) {
+    if (ball.x < opponent.x) opponent.x -= opponent.speed;
+    else opponent.x += opponent.speed;
+    
+    if (abs(ball.x - opponent.x) < 50 && opponent.y === groundLevel) {
+      opponent.vy = jumpForce;
+      opponent.isJumping = true;
+      
+      if (random() < 0.5) opponentSpiking = true;
+      else opponent.isBlocking = true;
+    }
+  }
+  
+  opponent.y += opponent.vy;
+  opponent.vy += gravity;
+  
+  if (opponent.y > groundLevel) {
+    opponent.y = groundLevel;
+    opponent.vy = 0;
+    opponent.isJumping = false;
+    opponentSpiking = false;
+    opponent.isBlocking = false;
+  }
+}
+
 function moveBall() {
-  ball.x += ball.dx;
-  ball.y += ball.dy;
+  ball.x += ball.vx;
+  ball.y += ball.vy;
+  ball.vy += gravity;
   
-  ball.dy += 0.5; // Gravity
-  
-  // Bounce off floor
-  if (ball.y + ball.radius > groundLevel) {
-    ball.y = groundLevel - ball.radius;
-    ball.dy *= -0.8;
+  if (ball.y + ball.r > groundLevel) {
+    ball.vy *= -0.7;
+    ball.y = groundLevel - ball.r;
+    
+    if (ball.x < width/2) opponentScore++;
+    else playerScore++;
+    
+    checkGameOver();
+    resetBall();
   }
   
-  // Bounce off walls
-  if (ball.x - ball.radius < 50 || ball.x + ball.radius > width - 50) {
-    ball.dx *= -1;
+  if (ball.x - ball.r < 0 || ball.x + ball.r > width) {
+    ball.vx *= -1;
   }
   
-  // Ball touches net
-  if (abs(ball.x - width/2) < 5 && ball.y > groundLevel - 200) {
-    ball.dx *= -1;
+  if (ball.x + ball.r > net.x && ball.x - ball.r < net.x + net.w && ball.y + ball.r > net.y) {
+    ball.vx *= -1;
+    ball.x = ball.x < width/2 ? net.x - ball.r : net.x + net.w + ball.r;
   }
   
-  // Collide with players
-  [playerLeft, playerRight].forEach(player => {
-    if (ball.x > player.x && ball.x < player.x + paddleWidth && ball.y + ball.radius > player.y && ball.y - ball.radius < player.y + paddleHeight) {
-      ball.dy = -ballSpeed;
-      ball.dx = player === playerLeft ? ballSpeed : -ballSpeed;
+  checkPlayerHit(player, playerSpiking, player.isBlocking);
+  checkPlayerHit(opponent, opponentSpiking, opponent.isBlocking);
+}
+
+function checkPlayerHit(p, isSpiking, isBlocking) {
+  if (ball.x > p.x - p.w/2 && ball.x < p.x + p.w/2 && ball.y + ball.r > p.y - p.h && ball.y - ball.r < p.y) {
+    if (isSpiking) {
+      ball.vy = spikeForce;
+      ball.vx = (ball.x - p.x) * 0.6;
+    } else if (isBlocking) {
+      ball.vy = jumpForce;
+      ball.vx *= -1;
+    } else {
+      ball.vy = jumpForce;
+      ball.vx = (ball.x - p.x) * 0.3;
     }
-  });
-  
-  // Scoring
-  if (ball.x < 0) {
-    rightScore++;
-    resetPoint();
-  } else if (ball.x > width) {
-    leftScore++;
-    resetPoint();
-  }
-  
-  if (leftScore >= maxScore || rightScore >= maxScore) {
-    gameOver = true;
   }
 }
 
-// Reset after point
-function resetPoint() {
-  pointScored = true;
-  setTimeout(() => { pointScored = false; }, 500);
-  ball.x = width/2;
-  ball.y = groundLevel - 100;
-  ball.dx = random([-ballSpeed, ballSpeed]);
-  ball.dy = -ballSpeed;
+function keyPressed() {
+  if (key === ' ' && player.y === groundLevel) {
+    player.vy = jumpForce;
+    player.isJumping = true;
+  }
+  if (key === 'z' && player.isJumping) playerSpiking = true;
+  if (key === 'x' && player.isJumping) player.isBlocking = true;
 }
 
-// Display scores
-function displayScore() {
-  fill(255);
-  textSize(24);
-  textAlign(CENTER);
-  text(leftScore, width/4, 50);
-  text(rightScore, 3*width/4, 50);
-}
-
-// Victory screen
-function showVictoryScreen() {
-  background(0, 200, 100);
-  fill(255);
-  textAlign(CENTER);
+function drawScores() {
   textSize(32);
-  text("Game Over", width/2, height/2 - 20);
-  textSize(24);
-  if (leftScore > rightScore) {
-    text("Left Player Wins!", width/2, height/2 + 20);
-  } else {
-    text("Right Player Wins!", width/2, height/2 + 20);
+  fill(255);
+  textAlign(CENTER, CENTER);
+  text(playerScore, width/4, 40);
+  text(opponentScore, width*3/4, 40);
+}
+
+function resetBall() {
+  ball.x = width/2;
+  ball.y = 100;
+  ball.vx = random([-4, 4]);
+  ball.vy = -6;
+}
+
+function checkGameOver() {
+  if (playerScore >= 5) {
+    gameOver = true;
+    winner = "YOU WIN!";
+  } else if (opponentScore >= 5) {
+    gameOver = true;
+    winner = "YOU LOSE!";
+  }
+}
+
+function drawVictoryScreen() {
+  background(0);
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(50);
+  text(winner, width/2, height/2 - 20);
+  
+  textSize(20);
+  text("Press R to Restart", width/2, height/2 + 40);
+}
+
+function keyTyped() {
+  if (key === 'r' && gameOver) {
+    playerScore = 0;
+    opponentScore = 0;
+    gameOver = false;
+    winner = "";
+    resetBall();
   }
 }
