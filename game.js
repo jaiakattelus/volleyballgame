@@ -10,6 +10,8 @@ let playerSpiking = false;
 let opponentSpiking = false;
 let gameOver = false;
 let winner = "";
+let serveTossed = false;
+let ballServed = false;
 
 function setup() {
   createCanvas(800, 450);
@@ -17,7 +19,7 @@ function setup() {
   
   player = { x: 150, y: groundLevel, w: 20, h: 50, vy: 0, speed: 5, isJumping: false, isBlocking: false };
   opponent = { x: width - 150, y: groundLevel, w: 20, h: 50, vy: 0, speed: 3, isJumping: false, isBlocking: false };
-  ball = { x: width/2, y: 100, r: 15, vx: 4, vy: -6 };
+  ball = { x: width/2, y: 100, r: 15, vx: 0, vy: 0 };
   net = { x: width/2 - 5, y: groundLevel - 100, w: 10, h: 100 };
 }
 
@@ -196,32 +198,38 @@ function handleOpponentAI() {
 }
 
 function moveBall() {
-  ball.x += ball.vx;
-  ball.y += ball.vy;
-  ball.vy += gravity;
-  
+  if (ballServed) {
+    ball.x += ball.vx;
+    ball.y += ball.vy;
+    ball.vy += gravity;
+  }
+
   if (ball.y + ball.r > groundLevel) {
     ball.vy *= -0.7;
     ball.y = groundLevel - ball.r;
-    
-    if (ball.x < width/2) opponentScore++;
-    else playerScore++;
-    
-    checkGameOver();
-    resetBall();
+
+    if (ballServed) {
+      if (ball.x < width/2) opponentScore++;
+      else playerScore++;
+      checkGameOver();
+      resetBall();
+      ballServed = false;
+    }
   }
-  
+
   if (ball.x - ball.r < 0 || ball.x + ball.r > width) {
     ball.vx *= -1;
   }
-  
+
   if (ball.x + ball.r > net.x && ball.x - ball.r < net.x + net.w && ball.y + ball.r > net.y) {
     ball.vx *= -1;
     ball.x = ball.x < width/2 ? net.x - ball.r : net.x + net.w + ball.r;
   }
-  
-  checkPlayerHit(player, playerSpiking, player.isBlocking);
-  checkPlayerHit(opponent, opponentSpiking, opponent.isBlocking);
+
+  if (ballServed) {
+    checkPlayerHit(player, playerSpiking, player.isBlocking);
+    checkPlayerHit(opponent, opponentSpiking, opponent.isBlocking);
+  }
 }
 
 function checkPlayerHit(p, isSpiking, isBlocking) {
@@ -244,8 +252,15 @@ function keyPressed() {
     player.vy = jumpForce;
     player.isJumping = true;
   }
-  if (key === 'z' && player.isJumping) playerSpiking = true;
+  if (key === 'd' && player.isJumping) playerSpiking = true;
   if (key === 'x' && player.isJumping) player.isBlocking = true;
+  if (key === 's' && !ballServed) {
+    ball.x = player.x;
+    ball.y = player.y - 60;
+    ball.vx = 0;
+    ball.vy = 0;
+    ballServed = true;
+  }
 }
 
 function drawScores() {
@@ -259,8 +274,9 @@ function drawScores() {
 function resetBall() {
   ball.x = width/2;
   ball.y = 100;
-  ball.vx = random([-4, 4]);
-  ball.vy = -6;
+  ball.vx = 0;
+  ball.vy = 0;
+  ballServed = false;
 }
 
 function checkGameOver() {
